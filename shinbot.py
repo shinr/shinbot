@@ -24,6 +24,7 @@ class Bot:
 		self.admin_password = password
 		self.plugins = []
 
+	# helper for formatting an irc command properly
 	def irc_command(self, command, arg):
 		c = command + ' ' + arg + "\r\n"
 		self.sock.send(c)
@@ -33,10 +34,12 @@ class Bot:
 			message = message[:-1]
 		return message
 
+	# helper for writing into both the console and privmsg
 	def write_output(self, message, target):
 		print message, '\n'
 		self.irc_command('PRIVMSG', target + ' :' + message)
 
+	# this handles all actual commands
 	def check_privmsg(self, message):
 		TAG_MESSAGE = 3
 		TAG_TARGET = 2
@@ -108,6 +111,7 @@ class Bot:
 						print "Faulty plugin without run-method. <", p, ">"
 						self.irc_command('PRIVMSG', sender + ' :Faulty plugin without run-method <' + p.__name__ + '>!')
 
+	# loads .py files from plugins directory, does not run any checks for validity though
 	def load_plugins(self):
 		plugins = []
 		plugin_folder = 'plugins'
@@ -121,8 +125,9 @@ class Bot:
 			plugins.append({"name":c, "info":info})
 		for p in plugins:
 			self.plugins.append(imp.load_module(p['name'].split('.')[0], *p['info']))
+			self.plugins[-1].init()
 
-
+	# main loop
 	def run(self, host='europe.afternet.org', port=6667):
 		r = ""
 		self.sock = socket.socket()

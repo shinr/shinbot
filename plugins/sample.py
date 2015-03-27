@@ -9,5 +9,9 @@
 # target can be a channel or a user
 # quite basic atm
 # just loops back to the sender what was said
+
+def init():
+	pass
+
 def run(message):
 	return (message[0].split('!')[0], ' '.join(message[3:]))
