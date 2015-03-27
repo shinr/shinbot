@@ -33,6 +33,10 @@ class Bot:
 			message = message[:-1]
 		return message
 
+	def write_output(self, message, target):
+		print message, '\n'
+		self.irc_command('PRIVMSG', target + ' :' + message)
+
 	def check_privmsg(self, message):
 		TAG_MESSAGE = 3
 		TAG_TARGET = 2
@@ -43,57 +47,66 @@ class Bot:
 		print "received ", message
 		host = message[TAG_HOST]
 		sender = message[TAG_HOST].split('!')[0]
-		if "authorize" == message[TAG_MESSAGE]:
-			password = message[-1]
-			if self.admin_password == password:
-				self.admin = host
-			self.irc_command('PRIVMSG', sender + ' :Authorized ' + sender + '!')
-		elif "hello" == message[TAG_MESSAGE]:
-			self.irc_command('PRIVMSG', sender + ' :Hello!')
-		elif "join" == message[TAG_MESSAGE] and host == self.admin:
-			channel = message[-1]
-			if not self.onchannel:
-				self.irc_command('JOIN', ':'+channel)
-				self.irc_command('PRIVMSG', sender + ' :Joining ' + channel + '!')
-				self.onchannel = True
-				self.channels.append(channel)
-		elif "part" == message[TAG_MESSAGE] and host == self.admin:
-			channel = message[-1]
-			if self.onchannel:
-				if channel in self.channels:
-					self.irc_command('PART', ':'+channel)
-				else:
-					print "Not on " + channel
-					self.irc_command('PRIVMSG', sender + ' :Not on ' + channel + '!')
-			else:
-				print "Not on a channel!"
-				self.irc_command('PRIVMSG', sender + ' :Not on channel!')
-		elif "quit" == message[TAG_MESSAGE] and host == self.admin and sender not in self.channels:
-			self.irc_command('PRIVMSG', sender + ' :Quitting!')
-			self.irc_command('QUIT', ':Bye!')
-			self.quitting = True
-		elif "say" == message[TAG_MESSAGE] and "in" == message[TAG_MESSAGE + 1]:
-			if message[TAG_MESSAGE + 2] in self.channels:
-				c = message[TAG_MESSAGE + 2] 
-				m = ' '.join(message[TAG_MESSAGE + 3:])
-				self.irc_command('PRIVMSG', c + ' :' + m)
-		elif self.nick in self.extract_nick(message[TAG_MESSAGE]):
-			for c in self.channels:
-				if c in message:
-					if 'rivo' in message and 'vitsi' in message:
-						self.irc_command('PRIVMSG', c + ' :penis lol')
+		target = message[TAG_TARGET]
+		# only privmsg
+		if target not in self.channels:
+			# admin commands
+			if host == self.admin:
+				if "join" == message[TAG_MESSAGE]:
+					channel = message[-1]
+					if not self.onchannel:
+						self.irc_command('JOIN', ':'+channel)
+						self.write_output("Joining " + channel, sender)
+						self.onchannel = True
+						self.channels.append(channel)
+				elif "part" == message[TAG_MESSAGE]:
+					channel = message[-1]
+					if len(self.channels) > 0:
+						if channel in self.channels:
+							self.irc_command('PART', ':'+channel)
+						else:
+							self.write_output("Not on " + channel, sender)
 					else:
-						self.irc_command('PRIVMSG', c + ' :so cool!')
+						self.write_output("Not on channel!", sender)
+				elif "quit" == message[TAG_MESSAGE]:
+					self.irc_command('PRIVMSG', sender + ' :Quitting!')
+					self.irc_command('QUIT', ':Bye!')
+					self.quitting = True
+				elif "say" == message[TAG_MESSAGE] and "in" == message[TAG_MESSAGE + 1]:
+					if message[TAG_MESSAGE + 2] in self.channels:
+						c = message[TAG_MESSAGE + 2] 
+						m = ' '.join(message[TAG_MESSAGE + 3:])
+						self.irc_command('PRIVMSG', c + ' :' + m)
+				elif "reload" == message[TAG_MESSAGE]:
+					pass
+			# public privmmsg commands
+			else:
+				if "authorize" == message[TAG_MESSAGE]:
+					password = message[-1]
+					if self.admin_password == password:
+						self.admin = host
+						self.irc_command('PRIVMSG', sender + ' :Authorized ' + sender + '!')
+				elif "hello" == message[TAG_MESSAGE]:
+					self.irc_command('PRIVMSG', sender + ' :Hello!')
+		# public channel commands
 		else:
-			print self.plugins
-			for p in self.plugins:
-				try:
-					response = p.run(message)
-					if response:
-						self.irc_command('PRIVMSG', response[0] + " :" + response[1])
-				except AttributeError:
-					print "Faulty plugin without run-method. <", p, ">"
-					self.irc_command('PRIVMSG', sender + ' :Faulty plugin without run-method <' + p.__name__ + '>!')
+			if self.nick in self.extract_nick(message[TAG_MESSAGE]):
+				for c in self.channels:
+					if c in message:
+						if 'rivo' in message and 'vitsi' in message:
+							self.irc_command('PRIVMSG', c + ' :penis lol')
+						else:
+							self.irc_command('PRIVMSG', c + ' :so cool!')
+			else:
+				print self.plugins
+				for p in self.plugins:
+					try:
+						response = p.run(message)
+						if response:
+							self.irc_command('PRIVMSG', response[0] + " :" + response[1])
+					except AttributeError:
+						print "Faulty plugin without run-method. <", p, ">"
+						self.irc_command('PRIVMSG', sender + ' :Faulty plugin without run-method <' + p.__name__ + '>!')
 
 	def load_plugins(self):
 		plugins = []
